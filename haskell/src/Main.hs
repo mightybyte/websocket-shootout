@@ -5,7 +5,7 @@
 module Main where
 
 import qualified Control.Concurrent as C
-import qualified Control.Concurrent.Broadcast as BC
+import qualified Control.Concurrent.Chan.Unagi as Chan
 import Control.Lens hiding ((.=))
 import Control.Monad (forever)
 import Data.Aeson
@@ -24,7 +24,7 @@ import Network.Wai.Handler.WebSockets
 import Network.WebSockets
 import Text.RawString.QQ
 
-type Broadcaster = BC.Broadcast ByteString
+type Broadcaster = (Chan.InChan ByteString, Chan.OutChan ByteString)
 
 amendTest :: Maybe Value
 amendTest = decode $ [r|
@@ -37,7 +37,7 @@ amendBroadcast v =
 
 broadcastThread :: Broadcaster -> Connection -> IO ()
 broadcastThread bc conn = forever $ do
-  t <- BC.listen bc
+  t <- Chan.readChan $ snd bc
   sendTextData conn t
 
 wtf conn =
@@ -59,7 +59,7 @@ bidiHandler bc conn = do
         let Just payload = t ^? key "payload"
         case t ^? key "type" . _String of
           Just "echo" -> sendTextData conn (mkPayload "echo" payload)
-          Just "broadcast" -> BC.signal bc (mkPayload "broadcastResult" payload)
+          Just "broadcast" -> Chan.writeChan (fst bc) (mkPayload "broadcastResult" payload)
           _ -> wtf conn
       _ -> do
         wtf conn
@@ -71,5 +71,5 @@ wsApp bc pending = do
 
 main :: IO ()
 main = do
-  bc <- BC.new
+  bc <- Chan.newChan
   runServer "127.0.0.1" 3000 (wsApp bc)

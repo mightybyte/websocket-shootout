@@ -31,6 +31,7 @@ executable hs-websocket-server
                      , stm
                      , stm-containers
                      , text
+                     , unagi-chan
                      , wai
                      , wai-websockets
                      , warp
